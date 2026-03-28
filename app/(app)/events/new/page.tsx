@@ -55,8 +55,8 @@ export default function NewEventPage() {
       location: form.location || null,
       starts_at: new Date(form.starts_at).toISOString(),
       ends_at: form.ends_at ? new Date(form.ends_at).toISOString() : null,
-      event_type: form.event_type as never,
-      visibility: form.visibility as never,
+      event_type: form.event_type as "hangout" | "sport" | "hike" | "trip" | "other",
+      visibility: form.visibility as "public" | "group" | "invite",
       max_attendees: form.max_attendees ? parseInt(form.max_attendees) : null,
       creator_id: user.id,
     });
@@ -72,7 +72,6 @@ export default function NewEventPage() {
 
   return (
     <div className="max-w-lg mx-auto px-4 py-6">
-      {/* Back */}
       <Link
         href="/feed"
         className="flex items-center gap-2 text-sm text-stone-500 hover:text-stone-900 mb-6 transition-colors"
@@ -86,7 +85,6 @@ export default function NewEventPage() {
       </h1>
 
       <form onSubmit={handleSubmit} className="space-y-5">
-        {/* Event type */}
         <div>
           <label className="block text-sm font-medium text-stone-700 mb-2">Type</label>
           <div className="flex gap-2 flex-wrap">
@@ -108,7 +106,6 @@ export default function NewEventPage() {
           </div>
         </div>
 
-        {/* Title */}
         <div>
           <label className="block text-sm font-medium text-stone-700 mb-1.5">
             What are you planning? <span className="text-red-400">*</span>
@@ -123,7 +120,6 @@ export default function NewEventPage() {
           />
         </div>
 
-        {/* Description */}
         <div>
           <label className="block text-sm font-medium text-stone-700 mb-1.5">Details</label>
           <textarea
@@ -135,7 +131,6 @@ export default function NewEventPage() {
           />
         </div>
 
-        {/* Location */}
         <div>
           <label className="block text-sm font-medium text-stone-700 mb-1.5">Location</label>
           <input
@@ -147,7 +142,6 @@ export default function NewEventPage() {
           />
         </div>
 
-        {/* Date/time */}
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-sm font-medium text-stone-700 mb-1.5">
@@ -172,7 +166,6 @@ export default function NewEventPage() {
           </div>
         </div>
 
-        {/* Max attendees */}
         <div>
           <label className="block text-sm font-medium text-stone-700 mb-1.5">
             Max attendees <span className="text-stone-400 font-normal">(optional)</span>
@@ -187,7 +180,6 @@ export default function NewEventPage() {
           />
         </div>
 
-        {/* Visibility */}
         <div>
           <label className="block text-sm font-medium text-stone-700 mb-2">
             Who can see this?
