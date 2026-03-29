@@ -42,9 +42,21 @@ export default function AppShell({
       <aside className="hidden md:flex flex-col w-56 bg-white border-r border-stone-100 shrink-0">
         {/* Logo */}
         <div className="px-5 py-5 border-b border-stone-100">
-          <h1 className="font-display text-xl font-bold tracking-tight">
-            Social<span className="text-brand-400">Cal</span>
-          </h1>
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-brand-400 flex items-center justify-center">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <rect x="1" y="3" width="12" height="10" rx="2" stroke="white" strokeWidth="1.5"/>
+                <path d="M1 6h12" stroke="white" strokeWidth="1.5"/>
+                <path d="M4 1v3M10 1v3" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+                <circle cx="4.5" cy="9" r="1" fill="white"/>
+                <circle cx="7" cy="9" r="1" fill="white"/>
+                <circle cx="9.5" cy="9" r="1" fill="white"/>
+              </svg>
+            </div>
+            <h1 className="font-display text-xl font-bold tracking-tight">
+              Social<span className="text-brand-400">Cal</span>
+            </h1>
+          </div>
         </div>
 
         {/* Nav */}

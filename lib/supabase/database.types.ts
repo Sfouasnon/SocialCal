@@ -148,6 +148,29 @@ export type Database = {
     Enums: Record<string, never>;
   };
 };
+event_comments: {
+  Row: {
+    id: string;
+    event_id: string;
+    user_id: string;
+    content: string;
+    created_at: string;
+  };
+  Insert: {
+    id?: string;
+    event_id: string;
+    user_id: string;
+    content: string;
+    created_at?: string;
+  };
+  Update: {
+    id?: string;
+    event_id?: string;
+    user_id?: string;
+    content?: string;
+    created_at?: string;
+  };
+};
 
 // Convenience types used throughout the app
 export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
@@ -163,4 +186,9 @@ export type EventWithDetails = Event & {
     status: EventAttendee["status"];
   }>;
   my_rsvp: EventAttendee["status"] | null;
+};
+export type EventComment = Database["public"]["Tables"]["event_comments"]["Row"];
+
+export type EventCommentWithUser = EventComment & {
+  user: Pick<Profile, "id" | "full_name" | "username" | "avatar_url">;
 };
