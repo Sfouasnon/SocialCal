@@ -123,6 +123,27 @@ export default function AppShell({
 
       {/* ── Main content ── */}
       <main className="flex-1 overflow-y-auto pb-20 md:pb-0">
+        {/* Mobile top header with logo */}
+        <div className="md:hidden flex items-center justify-between px-4 py-3 bg-white border-b border-stone-100 sticky top-0 z-10">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-brand-400 flex items-center justify-center">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <rect x="1" y="3" width="12" height="10" rx="2" stroke="white" strokeWidth="1.5"/>
+                <path d="M1 6h12" stroke="white" strokeWidth="1.5"/>
+                <path d="M4 1v3M10 1v3" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+                <circle cx="4.5" cy="9" r="1" fill="white"/>
+                <circle cx="7" cy="9" r="1" fill="white"/>
+                <circle cx="9.5" cy="9" r="1" fill="white"/>
+              </svg>
+            </div>
+            <span className="font-display text-lg font-bold tracking-tight">
+              Social<span className="text-brand-400">Cal</span>
+            </span>
+          </div>
+          <Link href="/events/new" className="bg-brand-400 hover:bg-brand-600 text-white text-xs font-medium px-3 py-1.5 rounded-xl transition-colors">
+            + Event
+          </Link>
+        </div>
         {children}
       </main>
 
