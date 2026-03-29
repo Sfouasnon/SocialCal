@@ -49,6 +49,8 @@ function HypeMeter({ going, comments }: { going: number; comments: number }) {
   );
 }
 
+const QUICK_EMOJIS = ["👍", "🔥", "😂", "🎉", "👀", "💪", "🙌", "❤️"];
+
 export default function EventCard({
   event,
   currentUserId,
@@ -149,6 +151,7 @@ export default function EventCard({
   return (
     <div className="bg-white rounded-2xl border border-stone-100 overflow-hidden hover:border-stone-200 transition-colors">
       <div className="p-4">
+        {/* Top row */}
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="flex items-center gap-2.5">
             <Avatar name={event.creator?.full_name} url={event.creator?.avatar_url} />
@@ -166,11 +169,13 @@ export default function EventCard({
           </span>
         </div>
 
+        {/* Title + description */}
         <h3 className="font-semibold text-stone-900 mb-1 leading-snug">{event.title}</h3>
         {event.description && (
           <p className="text-sm text-stone-500 mb-3 leading-relaxed">{event.description}</p>
         )}
 
+        {/* Details pills */}
         <div className="flex flex-wrap gap-2 mb-3">
           <span className="flex items-center gap-1.5 text-xs text-stone-500 bg-stone-50 px-2.5 py-1 rounded-full border border-stone-100">
             <Clock className="w-3 h-3" />
@@ -197,55 +202,62 @@ export default function EventCard({
           )}
         </div>
 
+        {/* Footer */}
         <div className="flex items-center justify-between pt-3 border-t border-stone-50">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1">
+          {/* Left: avatars + hype + chat button */}
+          <div className="flex items-center gap-2">
+            <div className="flex items-center">
               {event.attendees?.slice(0, 4).map((a, i) => (
                 <div key={i} className="-ml-1 first:ml-0 border-2 border-white rounded-full">
                   <Avatar name={(a as { user: { full_name: string | null } }).user?.full_name} url={(a as { user: { avatar_url: string | null } }).user?.avatar_url} size={6} />
                 </div>
               ))}
-              {goingCount > 0 && <span className="text-xs text-stone-400 ml-1">{goingCount} going</span>}
+              {goingCount > 0 && <span className="text-xs text-stone-400 ml-2">{goingCount} going</span>}
               {goingCount === 0 && !isCreator && <span className="text-xs text-stone-400">Be the first</span>}
             </div>
-            <HypeMeter going={goingCount} comments={commentCount} />
-          </div>
 
-          <div className="flex items-center gap-1.5">
+            <HypeMeter going={goingCount} comments={commentCount} />
+
+            {/* Chat button — left side, bigger */}
             <button
               onClick={() => setChatOpen((o) => !o)}
               className={clsx(
-                "flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-xl border transition-colors",
-                chatOpen ? "bg-stone-100 text-stone-700 border-stone-200" : "text-stone-400 border-stone-200 hover:bg-stone-50"
+                "flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-xl border transition-colors",
+                chatOpen
+                  ? "bg-stone-100 text-stone-700 border-stone-200"
+                  : "text-stone-500 border-stone-200 hover:bg-stone-50"
               )}
             >
-              <MessageCircle className="w-3.5 h-3.5" />
-              {commentCount > 0 && <span>{commentCount}</span>}
+              <MessageCircle className="w-4 h-4" />
+              {commentCount > 0 && <span className="text-xs">{commentCount}</span>}
             </button>
-
-            {!isCreator && (
-              <>
-                <button onClick={() => handleRsvp("maybe")} disabled={rsvpLoading}
-                  className={clsx("text-xs font-medium px-3 py-1.5 rounded-xl border transition-colors",
-                    myRsvp === "maybe" ? "bg-amber-50 text-amber-700 border-amber-200" : "text-stone-500 border-stone-200 hover:bg-stone-50"
-                  )}>
-                  Maybe
-                </button>
-                <button onClick={() => handleRsvp("going")} disabled={rsvpLoading}
-                  className={clsx("text-xs font-medium px-3 py-1.5 rounded-xl border transition-colors flex items-center gap-1",
-                    myRsvp === "going" ? "bg-brand-50 text-brand-600 border-brand-200" : "text-stone-600 border-stone-200 hover:bg-stone-50"
-                  )}>
-                  {myRsvp === "going" && <Check className="w-3 h-3" />}
-                  {myRsvp === "going" ? "Going!" : "Join"}
-                </button>
-              </>
-            )}
           </div>
+
+          {/* Right: RSVP buttons */}
+          {!isCreator && (
+            <div className="flex items-center gap-1.5">
+              <button onClick={() => handleRsvp("maybe")} disabled={rsvpLoading}
+                className={clsx("text-xs font-medium px-3 py-1.5 rounded-xl border transition-colors",
+                  myRsvp === "maybe" ? "bg-amber-50 text-amber-700 border-amber-200" : "text-stone-500 border-stone-200 hover:bg-stone-50"
+                )}>
+                Maybe
+              </button>
+              <button onClick={() => handleRsvp("going")} disabled={rsvpLoading}
+                className={clsx("text-xs font-medium px-3 py-1.5 rounded-xl border transition-colors flex items-center gap-1",
+                  myRsvp === "going" ? "bg-brand-50 text-brand-600 border-brand-200" : "text-stone-600 border-stone-200 hover:bg-stone-50"
+                )}>
+                {myRsvp === "going" && <Check className="w-3 h-3" />}
+                {myRsvp === "going" ? "Going!" : "Join"}
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
+      {/* Chat panel */}
       {chatOpen && (
         <div className="border-t border-stone-100">
+          {/* Comments list */}
           <div className="max-h-52 overflow-y-auto px-4 py-3 space-y-3 bg-stone-50">
             {comments.length === 0 ? (
               <p className="text-xs text-stone-400 text-center py-4">No comments yet — be the first!</p>
@@ -269,19 +281,40 @@ export default function EventCard({
             )}
             <div ref={chatEndRef} />
           </div>
-          <form onSubmit={handleComment} className="flex items-center gap-2 px-4 py-3 bg-white border-t border-stone-100">
-            <Avatar name={null} url={null} size={6} />
-            <input
-              type="text"
-              value={commentText}
-              onChange={(e) => setCommentText(e.target.value)}
-              placeholder="Say something..."
-              className="flex-1 text-sm bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 outline-none focus:border-brand-400 transition-colors"
-            />
-            <button type="submit" disabled={!commentText.trim() || commentLoading}
-              className="p-2 rounded-xl bg-brand-400 hover:bg-brand-600 disabled:opacity-40 text-white transition-colors">
-              <Send className="w-3.5 h-3.5" />
-            </button>
+
+          {/* Comment input with emoji bar */}
+          <form onSubmit={handleComment} className="px-4 py-3 bg-white border-t border-stone-100 space-y-2">
+            {/* Quick emoji row */}
+            <div className="flex gap-2">
+              {QUICK_EMOJIS.map((emoji) => (
+                <button
+                  key={emoji}
+                  type="button"
+                  onClick={() => setCommentText((t) => t + emoji)}
+                  className="text-lg hover:scale-125 transition-transform"
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+            {/* Input row */}
+            <div className="flex items-center gap-2">
+              <Avatar name={null} url={null} size={6} />
+              <input
+                type="text"
+                value={commentText}
+                onChange={(e) => setCommentText(e.target.value)}
+                placeholder="Say something..."
+                className="flex-1 text-sm bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 outline-none focus:border-brand-400 transition-colors"
+              />
+              <button
+                type="submit"
+                disabled={!commentText.trim() || commentLoading}
+                className="p-2 rounded-xl bg-brand-400 hover:bg-brand-600 disabled:opacity-40 text-white transition-colors"
+              >
+                <Send className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </form>
         </div>
       )}
