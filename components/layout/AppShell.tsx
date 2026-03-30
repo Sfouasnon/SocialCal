@@ -2,14 +2,15 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Calendar, Users, Bell, User, Plus, Rss } from "lucide-react";
+import { Calendar, Users, User, Plus, Rss, UserPlus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { Profile, Group } from "@/lib/supabase/database.types";
 import clsx from "clsx";
 
+
 const NAV = [
   { href: "/feed",     label: "Feed",     icon: Rss },
-  { href: "/calendar", label: "Calendar", icon: Calendar },
+  { href: "/friends",  label: "Friends",  icon: UserPlus },
   { href: "/groups",   label: "Groups",   icon: Users },
   { href: "/profile",  label: "Profile",  icon: User },
 ];
