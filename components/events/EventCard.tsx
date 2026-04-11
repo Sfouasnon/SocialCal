@@ -27,6 +27,108 @@ const HYPE_LEVELS: Record<number, { name: string; badgeBg: string; badgeText: st
 };
 
 const QUICK_EMOJIS = ["👍", "🔥", "😂", "🎉", "👀", "💪", "🙌", "❤️"];
+const REACTION_EMOJIS = ["❤️", "🔥", "😂", "👀", "🙌", "💀"];
+
+type CommentReaction = {
+  id: string;
+  comment_id: string;
+  user_id: string;
+  emoji: string;
+};
+
+function CommentReactions({
+  commentId,
+  currentUserId,
+  initialReactions,
+}: {
+  commentId: string;
+  currentUserId: string;
+  initialReactions: CommentReaction[];
+}) {
+  const [reactions, setReactions] = useState<CommentReaction[]>(initialReactions);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const supabase = createClient();
+
+  const grouped = reactions.reduce((acc, r) => {
+    acc[r.emoji] = acc[r.emoji] ?? [];
+    acc[r.emoji].push(r);
+    return acc;
+  }, {} as Record<string, CommentReaction[]>);
+
+  async function toggleReaction(emoji: string) {
+    const existing = reactions.find(
+      (r) => r.emoji === emoji && r.user_id === currentUserId
+    );
+    if (existing) {
+      setReactions((prev) => prev.filter((r) => r.id !== existing.id));
+      await supabase.from("comment_reactions").delete().eq("id", existing.id);
+    } else {
+      const optimistic: CommentReaction = {
+        id: `temp-${Date.now()}`,
+        comment_id: commentId,
+        user_id: currentUserId,
+        emoji,
+      };
+      setReactions((prev) => [...prev, optimistic]);
+      const { data } = await supabase
+        .from("comment_reactions")
+        .insert({ comment_id: commentId, user_id: currentUserId, emoji })
+        .select()
+        .single();
+      if (data) {
+        setReactions((prev) =>
+          prev.map((r) => (r.id === optimistic.id ? data : r))
+        );
+      }
+    }
+    setPickerOpen(false);
+  }
+
+  return (
+    <div className="relative">
+      <div className="flex items-center gap-1 flex-wrap mt-1">
+        {Object.entries(grouped).map(([emoji, rs]) => {
+          const mine = rs.some((r) => r.user_id === currentUserId);
+          return (
+            <button
+              key={emoji}
+              onClick={() => toggleReaction(emoji)}
+              className={clsx(
+                "flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full border transition-colors",
+                mine
+                  ? "bg-violet-50 border-violet-200 text-violet-700"
+                  : "bg-stone-50 border-stone-200 text-stone-500 hover:border-stone-300"
+              )}
+            >
+              <span className="text-sm">{emoji}</span>
+              {rs.length > 1 && <span>{rs.length}</span>}
+            </button>
+          );
+        })}
+        <button
+          onClick={() => setPickerOpen((o) => !o)}
+          className="text-xs text-stone-300 hover:text-stone-500 px-1 transition-colors"
+        >
+          {pickerOpen ? "✕" : "+ React"}
+        </button>
+      </div>
+
+      {pickerOpen && (
+        <div className="absolute left-0 top-6 z-20 flex gap-1 bg-white border border-stone-200 rounded-2xl px-2 py-1.5 shadow-sm">
+          {REACTION_EMOJIS.map((emoji) => (
+            <button
+              key={emoji}
+              onClick={() => toggleReaction(emoji)}
+              className="text-xl hover:scale-125 transition-transform px-0.5"
+            >
+              {emoji}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function formatEventDate(dateStr: string) {
   const d = new Date(dateStr);
@@ -100,10 +202,14 @@ function ReactionRow({ eventId, score }: { eventId: string; score: number }) {
   return (
     <div className="flex items-center gap-1.5 text-xs text-stone-400">
       <span>🎉</span><span>🔥</span><span>🙌</span>
-      <span className="ml-1">{score} hype points</span>
+      <span className="ml-1">{score} reactions</span>
     </div>
   );
 }
+
+type CommentWithReactions = EventCommentWithUser & {
+  reactions?: CommentReaction[];
+};
 
 // ─── Main Component ───────────────────────────────────────────
 
@@ -118,7 +224,7 @@ export default function EventCard({
 }) {
   const [rsvpLoading, setRsvpLoading]     = useState(false);
   const [chatOpen, setChatOpen]           = useState(false);
-  const [comments, setComments]           = useState<EventCommentWithUser[]>(event.top_comments ?? []);
+  const [comments, setComments]           = useState<CommentWithReactions[]>(event.top_comments ?? []);
   const [commentText, setCommentText]     = useState("");
   const [commentLoading, setCommentLoading] = useState(false);
   const [commentCount, setCommentCount]   = useState(event.top_comments?.length ?? 0);
@@ -147,11 +253,15 @@ export default function EventCard({
     if (!chatOpen) return;
     supabase
       .from("event_comments")
-      .select("*, user:profiles!event_comments_user_id_fkey(id, full_name, username, avatar_url)")
+      .select(`
+        *,
+        user:profiles!event_comments_user_id_fkey(id, full_name, username, avatar_url),
+        reactions:comment_reactions(id, comment_id, user_id, emoji)
+      `)
       .eq("event_id", event.id)
       .order("created_at", { ascending: true })
       .then(({ data }) => {
-        if (data) { setComments(data as EventCommentWithUser[]); setCommentCount(data.length); }
+        if (data) { setComments(data as CommentWithReactions[]); setCommentCount(data.length); }
       });
   }, [chatOpen, event.id]);
 
@@ -178,13 +288,14 @@ export default function EventCard({
     if (!commentText.trim() || commentLoading) return;
     setCommentLoading(true);
 
-    const optimistic: EventCommentWithUser = {
+    const optimistic: CommentWithReactions = {
       id: `temp-${Date.now()}`,
       event_id: event.id,
       user_id: currentUserId,
       content: commentText.trim(),
       created_at: new Date().toISOString(),
       user: { id: currentUserId, full_name: "You", username: "you", avatar_url: null },
+      reactions: [],
     };
     setComments((prev) => [...prev, optimistic]);
     setCommentCount((c) => c + 1);
@@ -194,11 +305,15 @@ export default function EventCard({
     const { data } = await supabase
       .from("event_comments")
       .insert({ event_id: event.id, user_id: currentUserId, content: text })
-      .select("*, user:profiles!event_comments_user_id_fkey(id, full_name, username, avatar_url)")
+      .select(`
+        *,
+        user:profiles!event_comments_user_id_fkey(id, full_name, username, avatar_url),
+        reactions:comment_reactions(id, comment_id, user_id, emoji)
+      `)
       .single();
 
     if (data) {
-      setComments((prev) => prev.map((c) => c.id === optimistic.id ? data as EventCommentWithUser : c));
+      setComments((prev) => prev.map((c) => c.id === optimistic.id ? data as CommentWithReactions : c));
     }
     setCommentLoading(false);
   }
@@ -422,6 +537,11 @@ export default function EventCard({
                       </span>
                     </div>
                     <p className="text-sm text-stone-600 leading-snug mt-0.5">{c.content}</p>
+                    <CommentReactions
+                      commentId={c.id}
+                      currentUserId={currentUserId}
+                      initialReactions={(c as CommentWithReactions).reactions ?? []}
+                    />
                   </div>
                 </div>
               ))
