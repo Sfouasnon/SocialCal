@@ -50,65 +50,46 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["groups"]["Insert"]>;
       };
       group_members: {
-        Row: {
-          group_id: string;
-          user_id: string;
-          joined_at: string;
-        };
-        Insert: {
-          group_id: string;
-          user_id: string;
-          joined_at?: string;
-        };
+        Row: { group_id: string; user_id: string; joined_at: string };
+        Insert: { group_id: string; user_id: string; joined_at?: string };
         Update: never;
       };
       events: {
-  Row: {
-    id: string;
-    title: string;
-    description: string | null;
-    location: string | null;
-    starts_at: string;
-    ends_at: string | null;
-    creator_id: string;
-    group_id: string | null;
-    visibility: "public" | "group" | "invite";
-    max_attendees: number | null;
-    event_type: "hangout" | "sport" | "hike" | "trip" | "other";
-    created_at: string;
-    updated_at: string;
-  };
-  Insert: {
-    id?: string;
-    title: string;
-    description?: string | null;
-    location?: string | null;
-    starts_at: string;
-    ends_at?: string | null;
-    creator_id: string;
-    group_id?: string | null;
-    visibility?: "public" | "group" | "invite";
-    max_attendees?: number | null;
-    event_type?: "hangout" | "sport" | "hike" | "trip" | "other";
-    created_at?: string;
-    updated_at?: string;
-  };
-  Update: {
-    id?: string;
-    title?: string;
-    description?: string | null;
-    location?: string | null;
-    starts_at?: string;
-    ends_at?: string | null;
-    creator_id?: string;
-    group_id?: string | null;
-    visibility?: "public" | "group" | "invite";
-    max_attendees?: number | null;
-    event_type?: "hangout" | "sport" | "hike" | "trip" | "other";
-    created_at?: string;
-    updated_at?: string;
-  };
-};
+        Row: {
+          id: string;
+          title: string;
+          description: string | null;
+          location: string | null;
+          starts_at: string;
+          ends_at: string | null;
+          creator_id: string;
+          group_id: string | null;
+          visibility: "public" | "group" | "invite";
+          max_attendees: number | null;
+          event_type: "hangout" | "sport" | "hike" | "trip" | "other";
+          cover_url: string | null;
+          hype_score: number;
+          hype_level: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          title: string;
+          description?: string | null;
+          location?: string | null;
+          starts_at: string;
+          ends_at?: string | null;
+          creator_id: string;
+          group_id?: string | null;
+          visibility?: "public" | "group" | "invite";
+          max_attendees?: number | null;
+          event_type?: "hangout" | "sport" | "hike" | "trip" | "other";
+          cover_url?: string | null;
+          hype_score?: number;
+          hype_level?: number;
+          created_at?: string;
+          updated_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["events"]["Insert"]>;
       };
@@ -126,6 +107,23 @@ export type Database = {
           joined_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["event_attendees"]["Insert"]>;
+      };
+      event_comments: {
+        Row: {
+          id: string;
+          event_id: string;
+          user_id: string;
+          content: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          event_id: string;
+          user_id: string;
+          content: string;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["event_comments"]["Insert"]>;
       };
       friendships: {
         Row: {
@@ -148,46 +146,24 @@ export type Database = {
     Enums: Record<string, never>;
   };
 };
-event_comments: {
-  Row: {
-    id: string;
-    event_id: string;
-    user_id: string;
-    content: string;
-    created_at: string;
-  };
-  Insert: {
-    id?: string;
-    event_id: string;
-    user_id: string;
-    content: string;
-    created_at?: string;
-  };
-  Update: {
-    id?: string;
-    event_id?: string;
-    user_id?: string;
-    content?: string;
-    created_at?: string;
-  };
-};
 
-// Convenience types used throughout the app
-export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
-export type Group = Database["public"]["Tables"]["groups"]["Row"];
-export type Event = Database["public"]["Tables"]["events"]["Row"];
+// ─── Convenience types ───────────────────────────────────────
+export type Profile       = Database["public"]["Tables"]["profiles"]["Row"];
+export type Group         = Database["public"]["Tables"]["groups"]["Row"];
+export type Event         = Database["public"]["Tables"]["events"]["Row"];
 export type EventAttendee = Database["public"]["Tables"]["event_attendees"]["Row"];
+export type EventComment  = Database["public"]["Tables"]["event_comments"]["Row"];
 
 export type EventWithDetails = Event & {
   creator: Pick<Profile, "id" | "full_name" | "username" | "avatar_url">;
-  group: Pick<Group, "id" | "name" | "color"> | null;
+  group:   Pick<Group, "id" | "name" | "color"> | null;
   attendees: Array<{
-    user: Pick<Profile, "id" | "full_name" | "avatar_url">;
+    user:   Pick<Profile, "id" | "full_name" | "avatar_url">;
     status: EventAttendee["status"];
   }>;
-  my_rsvp: EventAttendee["status"] | null;
+  my_rsvp:      EventAttendee["status"] | null;
+  top_comments: EventCommentWithUser[];
 };
-export type EventComment = Database["public"]["Tables"]["event_comments"]["Row"];
 
 export type EventCommentWithUser = EventComment & {
   user: Pick<Profile, "id" | "full_name" | "username" | "avatar_url">;
