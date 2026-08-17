@@ -1,9 +1,14 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
- 
-export async function middleware(request: NextRequest) {
+
+export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
- 
+  type CookieToSet = {
+    name: string;
+    value: string;
+    options: Parameters<typeof supabaseResponse.cookies.set>[2];
+  };
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -12,7 +17,7 @@ export async function middleware(request: NextRequest) {
         getAll() {
           return request.cookies.getAll();
         },
-        setAll(cookiesToSet) {
+        setAll(cookiesToSet: CookieToSet[]) {
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           );
@@ -24,16 +29,15 @@ export async function middleware(request: NextRequest) {
       },
     }
   );
- 
-  // Refresh session — keeps cookies alive across requests
-  await supabase.auth.getSession();
- 
+
+  // Refresh and revalidate the session cookies on every matched request.
+  await supabase.auth.getUser();
+
   return supabaseResponse;
 }
- 
+
 export const config = {
   matcher: [
     "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
- 

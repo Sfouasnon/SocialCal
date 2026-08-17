@@ -1,9 +1,27 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Search, UserPlus, Check, X, Clock } from "lucide-react";
-import type { Profile } from "@/lib/supabase/database.types";
+import type { FriendRequest, Profile } from "@/lib/supabase/database.types";
+
+export type FriendListProfile = Pick<
+  Profile,
+  "id" | "full_name" | "username" | "avatar_url" | "availability_status"
+>;
+
+type FriendPreview = Pick<
+  Profile,
+  "id" | "full_name" | "username" | "avatar_url" | "availability_status"
+>;
+
+export type PendingReceivedRequest = FriendRequest & {
+  requester: FriendPreview | null;
+};
+
+export type PendingSentRequest = FriendRequest & {
+  addressee: FriendPreview | null;
+};
 
 const STATUS_CONFIG = {
   free:  { label: "Free",  dot: "bg-green-400" },
@@ -29,17 +47,32 @@ export default function FriendsClient({
   pendingSent,
 }: {
   currentUserId: string;
-  friends: Profile[];
-  pendingReceived: never[];
-  pendingSent: never[];
+  friends: FriendListProfile[];
+  pendingReceived: PendingReceivedRequest[];
+  pendingSent: PendingSentRequest[];
 }) {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Profile[]>([]);
   const [searching, setSearching] = useState(false);
   const [sentIds, setSentIds] = useState<Set<string>>(new Set());
-  const [myFriends, setMyFriends] = useState<Profile[]>(friends);
-  const [myPendingReceived, setMyPendingReceived] = useState<never[]>(pendingReceived);
+  const [busyIds, setBusyIds] = useState<Set<string>>(new Set());
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [myFriends, setMyFriends] = useState<FriendListProfile[]>(friends);
+  const [myPendingReceived, setMyPendingReceived] =
+    useState<PendingReceivedRequest[]>(pendingReceived);
+
+  function setBusy(id: string, busy: boolean) {
+    setBusyIds((prev) => {
+      const next = new Set(prev);
+      if (busy) {
+        next.add(id);
+      } else {
+        next.delete(id);
+      }
+      return next;
+    });
+  }
 
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -56,32 +89,83 @@ export default function FriendsClient({
   }
 
   async function sendRequest(addresseeId: string) {
-    await supabase.from("friend_requests").insert({
+    if (busyIds.has(addresseeId) || sentIds.has(addresseeId) || sentFromDb.has(addresseeId)) {
+      return;
+    }
+
+    setActionError(null);
+    setBusy(addresseeId, true);
+    setSentIds((prev) => new Set(prev).add(addresseeId));
+
+    const { error } = await supabase.from("friend_requests").insert({
       requester_id: currentUserId,
       addressee_id: addresseeId,
     });
-    setSentIds((prev) => new Set([...prev, addresseeId]));
+
+    if (error) {
+      setSentIds((prev) => {
+        const next = new Set(prev);
+        next.delete(addresseeId);
+        return next;
+      });
+      setActionError("Could not send the friend request. Try again.");
+    }
+
+    setBusy(addresseeId, false);
   }
 
-  async function acceptRequest(requestId: string, requester: Profile) {
-    await supabase
+  async function acceptRequest(request: PendingReceivedRequest) {
+    if (!request.requester || busyIds.has(request.id)) return;
+
+    setActionError(null);
+    setBusy(request.id, true);
+    setMyPendingReceived((prev) => prev.filter((r) => r.id !== request.id));
+    setMyFriends((prev) =>
+      prev.some((friend) => friend.id === request.requester?.id)
+        ? prev
+        : [...prev, request.requester as FriendPreview]
+    );
+
+    const { error } = await supabase
       .from("friend_requests")
       .update({ status: "accepted" })
-      .eq("id", requestId);
-    setMyFriends((prev) => [...prev, requester]);
-    setMyPendingReceived((prev) => prev.filter((r: never & { id: string }) => r.id !== requestId));
+      .eq("id", request.id);
+
+    if (error) {
+      setMyFriends((prev) =>
+        prev.filter((friend) => friend.id !== request.requester?.id)
+      );
+      setMyPendingReceived((prev) => [request, ...prev]);
+      setActionError("Could not accept the friend request. Try again.");
+    }
+
+    setBusy(request.id, false);
   }
 
-  async function declineRequest(requestId: string) {
-    await supabase
+  async function declineRequest(request: PendingReceivedRequest) {
+    if (busyIds.has(request.id)) return;
+
+    setActionError(null);
+    setBusy(request.id, true);
+    setMyPendingReceived((prev) => prev.filter((r) => r.id !== request.id));
+
+    const { error } = await supabase
       .from("friend_requests")
       .update({ status: "declined" })
-      .eq("id", requestId);
-    setMyPendingReceived((prev) => prev.filter((r: never & { id: string }) => r.id !== requestId));
+      .eq("id", request.id);
+
+    if (error) {
+      setMyPendingReceived((prev) => [request, ...prev]);
+      setActionError("Could not decline the friend request. Try again.");
+    }
+
+    setBusy(request.id, false);
   }
 
   const friendIds = new Set(myFriends.map((f) => f.id));
-  const sentFromDb = new Set((pendingSent as never & { addressee: { id: string } }[]).map((r) => r.addressee?.id));
+  const sentFromDb = new Set(
+    pendingSent.map((r) => r.addressee?.id).filter((id): id is string => Boolean(id))
+  );
 
   return (
     <div className="max-w-lg mx-auto px-4 py-6">
@@ -107,6 +191,12 @@ export default function FriendsClient({
           Search
         </button>
       </form>
+
+      {actionError && (
+        <p className="mb-6 text-sm text-red-500 bg-red-50 border border-red-100 rounded-xl px-4 py-3">
+          {actionError}
+        </p>
+      )}
 
       {/* Search results */}
       {results.length > 0 && (
@@ -134,6 +224,7 @@ export default function FriendsClient({
                   ) : (
                     <button
                       onClick={() => sendRequest(profile.id)}
+                      disabled={busyIds.has(profile.id)}
                       className="flex items-center gap-1.5 text-xs font-medium bg-brand-50 text-brand-600 border border-brand-200 px-3 py-1.5 rounded-xl hover:bg-brand-100 transition-colors"
                     >
                       <UserPlus className="w-3.5 h-3.5" /> Add
@@ -153,7 +244,7 @@ export default function FriendsClient({
             Friend requests ({myPendingReceived.length})
           </p>
           <div className="space-y-2">
-            {(myPendingReceived as never & { id: string; requester: Profile }[]).map((req) => (
+            {myPendingReceived.map((req) => (
               <div key={req.id} className="flex items-center gap-3 bg-white border border-stone-100 rounded-xl p-3">
                 <Avatar name={req.requester?.full_name} url={req.requester?.avatar_url} />
                 <div className="flex-1 min-w-0">
@@ -162,13 +253,15 @@ export default function FriendsClient({
                 </div>
                 <div className="flex gap-1.5">
                   <button
-                    onClick={() => acceptRequest(req.id, req.requester)}
+                    onClick={() => acceptRequest(req)}
+                    disabled={busyIds.has(req.id)}
                     className="p-1.5 rounded-xl bg-brand-50 text-brand-600 border border-brand-200 hover:bg-brand-100 transition-colors"
                   >
                     <Check className="w-4 h-4" />
                   </button>
                   <button
-                    onClick={() => declineRequest(req.id)}
+                    onClick={() => declineRequest(req)}
+                    disabled={busyIds.has(req.id)}
                     className="p-1.5 rounded-xl bg-red-50 text-red-500 border border-red-100 hover:bg-red-100 transition-colors"
                   >
                     <X className="w-4 h-4" />

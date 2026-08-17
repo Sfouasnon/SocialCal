@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ArrowLeft, Loader2, Camera, X } from "lucide-react";
@@ -19,6 +19,21 @@ const VISIBILITY = [
   { value: "group",  label: "Group only",   desc: "Only members of a specific group" },
   { value: "invite", label: "Invite only",  desc: "Only people you invite" },
 ];
+
+const MAX_COVER_SIZE_BYTES = 5 * 1024 * 1024;
+const COVER_MIME_TO_EXT = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/gif": "gif",
+} as const;
+const COVER_ACCEPT = Object.keys(COVER_MIME_TO_EXT).join(",");
+
+type CoverMimeType = keyof typeof COVER_MIME_TO_EXT;
+
+function isAllowedCoverType(type: string): type is CoverMimeType {
+  return type in COVER_MIME_TO_EXT;
+}
 
 export default function NewEventPage() {
   const router   = useRouter();
@@ -45,9 +60,31 @@ export default function NewEventPage() {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
+  useEffect(() => {
+    return () => {
+      if (coverPreview) {
+        URL.revokeObjectURL(coverPreview);
+      }
+    };
+  }, [coverPreview]);
+
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    if (!isAllowedCoverType(file.type)) {
+      setError("Cover photo must be a JPG, PNG, WebP, or GIF.");
+      e.target.value = "";
+      return;
+    }
+
+    if (file.size > MAX_COVER_SIZE_BYTES) {
+      setError("Cover photo must be 5 MB or smaller.");
+      e.target.value = "";
+      return;
+    }
+
+    setError(null);
     setCoverFile(file);
     setCoverPreview(URL.createObjectURL(file));
   }
@@ -60,15 +97,30 @@ export default function NewEventPage() {
 
   async function uploadCover(userId: string): Promise<string | null> {
     if (!coverFile) return null;
+    const coverType = coverFile.type;
+    if (!isAllowedCoverType(coverType)) {
+      throw new Error("Cover photo must be a JPG, PNG, WebP, or GIF.");
+    }
+    if (coverFile.size > MAX_COVER_SIZE_BYTES) {
+      throw new Error("Cover photo must be 5 MB or smaller.");
+    }
+
     setUploading(true);
-    const ext      = coverFile.name.split(".").pop() ?? "jpg";
-    const fileName = `${userId}-${Date.now()}.${ext}`;
-    const { error: upErr } = await supabase.storage
-      .from("event-covers")
-      .upload(fileName, coverFile, { contentType: coverFile.type });
-    setUploading(false);
-    if (upErr) { console.error(upErr); return null; }
-    return supabase.storage.from("event-covers").getPublicUrl(fileName).data.publicUrl;
+    try {
+      const ext = COVER_MIME_TO_EXT[coverType];
+      const filePath = `${userId}/${crypto.randomUUID()}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from("event-covers")
+        .upload(filePath, coverFile, { contentType: coverFile.type });
+
+      if (upErr) {
+        throw new Error(upErr.message);
+      }
+
+      return supabase.storage.from("event-covers").getPublicUrl(filePath).data.publicUrl;
+    } finally {
+      setUploading(false);
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -77,9 +129,20 @@ export default function NewEventPage() {
     setError(null);
 
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { router.push("/auth/login"); return; }
+    if (!user) { router.push("/auth/login"); setLoading(false); return; }
 
-    const coverUrl = await uploadCover(user.id);
+    let coverUrl: string | null = null;
+    try {
+      coverUrl = await uploadCover(user.id);
+    } catch (uploadError) {
+      setError(
+        uploadError instanceof Error
+          ? uploadError.message
+          : "Could not upload cover photo."
+      );
+      setLoading(false);
+      return;
+    }
 
     const { data: event, error: err } = await supabase
       .from("events")
@@ -146,16 +209,16 @@ export default function NewEventPage() {
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
-              className="w-full h-36 rounded-2xl border-2 border-dashed border-stone-200 hover:border-stone-300 flex flex-col items-center justify-content-center gap-2 text-stone-400 hover:text-stone-500 transition-colors"
+              className="w-full h-36 rounded-2xl border-2 border-dashed border-stone-200 hover:border-stone-300 flex flex-col items-center justify-center gap-2 text-stone-400 hover:text-stone-500 transition-colors"
             >
-              <Camera className="w-7 h-7 mt-8" />
-              <span className="text-sm font-medium pb-8">Add a cover photo</span>
+              <Camera className="w-7 h-7" />
+              <span className="text-sm font-medium">Add a cover photo</span>
             </button>
           )}
           <input
             ref={fileRef}
             type="file"
-            accept="image/*"
+            accept={COVER_ACCEPT}
             className="hidden"
             onChange={handleFileChange}
           />

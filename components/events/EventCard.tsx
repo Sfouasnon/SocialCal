@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
-  MapPin, Clock, Users, Check, MessageCircle, Send, CalendarPlus,
+  MapPin, Clock, Check, MessageCircle, Send, CalendarPlus,
 } from "lucide-react";
 import { formatDistanceToNow, format, isToday, isTomorrow } from "date-fns";
 import { createClient } from "@/lib/supabase/client";
@@ -36,6 +36,10 @@ type CommentReaction = {
   emoji: string;
 };
 
+function createTempId() {
+  return `temp-${crypto.randomUUID()}`;
+}
+
 function CommentReactions({
   commentId,
   currentUserId,
@@ -47,7 +51,7 @@ function CommentReactions({
 }) {
   const [reactions, setReactions] = useState<CommentReaction[]>(initialReactions);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   const grouped = reactions.reduce((acc, r) => {
     acc[r.emoji] = acc[r.emoji] ?? [];
@@ -64,7 +68,7 @@ function CommentReactions({
       await supabase.from("comment_reactions").delete().eq("id", existing.id);
     } else {
       const optimistic: CommentReaction = {
-        id: `temp-${Date.now()}`,
+        id: createTempId(),
         comment_id: commentId,
         user_id: currentUserId,
         emoji,
@@ -191,12 +195,12 @@ function HypeMeter({ score, level }: { score: number; level: number }) {
       </div>
 
       {/* Reactions summary — collapsed, quiet */}
-      <ReactionRow eventId="" score={score} />
+      <ReactionRow score={score} />
     </div>
   );
 }
 
-function ReactionRow({ eventId, score }: { eventId: string; score: number }) {
+function ReactionRow({ score }: { score: number }) {
   // Static display on card — full interaction opens in chat panel
   if (score === 0) return null;
   return (
@@ -229,13 +233,16 @@ export default function EventCard({
   const [commentLoading, setCommentLoading] = useState(false);
   const [commentCount, setCommentCount]   = useState(event.top_comments?.length ?? 0);
   const [calAdded, setCalAdded]           = useState(false);
+  const [actionError, setActionError]     = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
-  const supabase   = createClient();
+  const supabase   = useMemo(() => createClient(), []);
 
   const typeStyle  = TYPE_STYLES[event.event_type] ?? TYPE_STYLES.other;
   const goingCount = event.attendees?.filter((a) => a.status === "going").length ?? 0;
   const isCreator  = event.creator_id === currentUserId;
-  const myRsvp     = event.my_rsvp;
+  const myRsvp     = event.my_rsvp === "going" || event.my_rsvp === "maybe"
+    ? event.my_rsvp
+    : null;
   const hypeScore  = event.hype_score ?? 0;
   const hypeLevel  = (event.hype_level as 1 | 2 | 3 | 4) ?? 1;
 
@@ -246,9 +253,9 @@ export default function EventCard({
       .select("id", { count: "exact", head: true })
       .eq("event_id", event.id)
       .then(({ count }) => { if (count !== null) setCommentCount(count); });
-  }, [event.id]);
+  }, [event.id, event.top_comments, supabase]);
 
-  // Load full comments when chat opens
+  // Load full comments when chat opens or the feed receives a comment update.
   useEffect(() => {
     if (!chatOpen) return;
     supabase
@@ -261,26 +268,42 @@ export default function EventCard({
       .eq("event_id", event.id)
       .order("created_at", { ascending: true })
       .then(({ data }) => {
-        if (data) { setComments(data as CommentWithReactions[]); setCommentCount(data.length); }
+        if (data) {
+          setComments(data as CommentWithReactions[]);
+          setCommentCount(data.length);
+        }
       });
-  }, [chatOpen, event.id]);
+  }, [chatOpen, event.id, event.top_comments, supabase]);
 
   useEffect(() => {
     if (chatOpen) chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [comments, chatOpen]);
 
   async function handleRsvp(status: "going" | "maybe") {
+    if (rsvpLoading) return;
+
     setRsvpLoading(true);
+    setActionError(null);
+    const previousStatus = myRsvp;
     const newStatus = myRsvp === status ? null : status;
-    if (newStatus === null) {
-      await supabase.from("event_attendees").delete()
-        .eq("event_id", event.id).eq("user_id", currentUserId);
-    } else {
-      await supabase.from("event_attendees")
-        .upsert({ event_id: event.id, user_id: currentUserId, status: newStatus });
-    }
     onRsvpChange(event.id, newStatus);
-    setRsvpLoading(false);
+
+    try {
+      const { error } = newStatus === null
+        ? await supabase.from("event_attendees").delete()
+          .eq("event_id", event.id).eq("user_id", currentUserId)
+        : await supabase.from("event_attendees")
+          .upsert({ event_id: event.id, user_id: currentUserId, status: newStatus });
+
+      if (error) {
+        throw error;
+      }
+    } catch {
+      onRsvpChange(event.id, previousStatus);
+      setActionError("Could not update RSVP. Try again.");
+    } finally {
+      setRsvpLoading(false);
+    }
   }
 
   async function handleComment(e: React.FormEvent) {
@@ -289,7 +312,7 @@ export default function EventCard({
     setCommentLoading(true);
 
     const optimistic: CommentWithReactions = {
-      id: `temp-${Date.now()}`,
+      id: createTempId(),
       event_id: event.id,
       user_id: currentUserId,
       content: commentText.trim(),
@@ -338,7 +361,8 @@ export default function EventCard({
     return d.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
   }
 
-  const topComments = comments.slice(0, 2);
+  const visibleComments = chatOpen ? comments : event.top_comments ?? [];
+  const topComments = visibleComments.slice(0, 2);
 
   return (
     <div className="bg-white rounded-2xl border border-stone-100 overflow-hidden hover:border-stone-200 transition-colors">
@@ -442,8 +466,8 @@ export default function EventCard({
             {event.attendees?.slice(0, 3).map((a, i) => (
               <div key={i} className="-ml-1 first:ml-0 border-2 border-white rounded-full">
                 <Avatar
-                  name={(a as any).user?.full_name}
-                  url={(a as any).user?.avatar_url}
+                  name={a.user?.full_name}
+                  url={a.user?.avatar_url}
                   size={6}
                 />
               </div>
@@ -514,6 +538,10 @@ export default function EventCard({
           </div>
         )}
       </div>
+
+      {actionError && (
+        <p className="px-4 pb-3 text-xs text-red-500">{actionError}</p>
+      )}
 
       {/* ── Expandable chat ── */}
       {chatOpen && (

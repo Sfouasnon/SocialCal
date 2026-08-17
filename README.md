@@ -28,11 +28,13 @@ cp .env.example .env.local
 # Fill in your Supabase URL and anon key
 ```
 
-### 3. Run the database schema
+### 3. Run the database migrations
 
 1. Go to your [Supabase dashboard](https://supabase.com/dashboard)
-2. Open your project → **SQL Editor** → **New query**
-3. Paste the contents of `supabase/schema.sql` and click **Run**
+2. Open your project -> **SQL Editor** -> **New query**
+3. Run the SQL files in `supabase/migrations/` in filename order
+
+`supabase/schema.sql` is kept as a full schema snapshot for manual setup and review.
 
 ### 4. Enable Google Auth (optional but recommended)
 

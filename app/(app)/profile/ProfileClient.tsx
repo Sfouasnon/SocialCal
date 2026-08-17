@@ -5,12 +5,19 @@ import { createClient } from "@/lib/supabase/client";
 import { Loader2, Check } from "lucide-react";
 import type { Profile } from "@/lib/supabase/database.types";
 
+type AvailabilityStatus = Profile["availability_status"];
+
 const STATUS_OPTIONS = [
   { value: "free",  label: "Free",  emoji: "🟢", desc: "Open for plans" },
   { value: "busy",  label: "Busy",  emoji: "⚫", desc: "Occupied but local" },
   { value: "oot",   label: "OOT",   emoji: "🔴", desc: "Out of town" },
   { value: "maybe", label: "Maybe", emoji: "🟡", desc: "Might be free" },
-];
+] satisfies Array<{
+  value: AvailabilityStatus;
+  label: string;
+  emoji: string;
+  desc: string;
+}>;
 
 export default function ProfileClient({
   profile,
@@ -23,7 +30,7 @@ export default function ProfileClient({
   const [form, setForm] = useState({
     full_name: profile?.full_name ?? "",
     username: profile?.username ?? "",
-    availability_status: profile?.availability_status ?? "free",
+    availability_status: (profile?.availability_status ?? "free") as AvailabilityStatus,
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);

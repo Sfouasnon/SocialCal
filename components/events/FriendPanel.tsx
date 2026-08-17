@@ -2,6 +2,11 @@
 
 import type { Profile } from "@/lib/supabase/database.types";
 
+export type FriendPanelProfile = Pick<
+  Profile,
+  "id" | "full_name" | "username" | "avatar_url" | "availability_status"
+>;
+
 const STATUS_CONFIG = {
   free:  { label: "Free",  dot: "bg-green-400",  text: "text-green-700" },
   busy:  { label: "Busy",  dot: "bg-stone-300",  text: "text-stone-500" },
@@ -19,7 +24,7 @@ function Initials({ name, url }: { name: string | null; url: string | null }) {
   );
 }
 
-export default function FriendPanel({ friends }: { friends: Profile[] }) {
+export default function FriendPanel({ friends }: { friends: FriendPanelProfile[] }) {
   const free  = friends.filter((f) => f.availability_status === "free");
   const other = friends.filter((f) => f.availability_status !== "free");
 

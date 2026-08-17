@@ -12,11 +12,37 @@
   }
 
   html {
-    -webkit-tap-highlight-color: transparent;
+    -webkit-tap-highlight-color: rgba(29, 158, 117, 0.18);
   }
 
   body {
     font-family: var(--font-sans), system-ui, sans-serif;
+  }
+
+  button,
+  [role="button"],
+  a[href] {
+    touch-action: manipulation;
+  }
+
+  button:not(:disabled),
+  [role="button"],
+  a[href] {
+    cursor: pointer;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    button:not(:disabled):active,
+    [role="button"]:active,
+    a[href]:active {
+      transform: scale(0.98);
+    }
   }
 }
 
