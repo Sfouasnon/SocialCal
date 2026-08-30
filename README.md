@@ -6,7 +6,7 @@ A social calendar app where you post events, friends join, and everyone can see 
 
 ## Stack
 
-- **Next.js 14** (App Router) — web + future mobile
+- **Next.js 16** (App Router) — web + future mobile
 - **Supabase** — auth, database (PostgreSQL), real-time sync
 - **Tailwind CSS** — styling
 - **Vercel** — deployment (recommended)
